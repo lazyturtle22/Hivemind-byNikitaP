@@ -1,4 +1,4 @@
-# Hivemind
+# Hivemind - ALPHA VERSION PLEASE DONT HATE ME LOL
 
 **Self-spreading firmware for ESP32-C6 — an authorized fleet-provisioning / OTA tool.**
 
