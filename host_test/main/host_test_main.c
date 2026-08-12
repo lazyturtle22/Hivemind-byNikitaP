@@ -18,6 +18,10 @@ void test_trickle_suppresses_when_k_consistent(void);
 void test_trickle_doubles_and_caps(void);
 void test_trickle_inconsistent_resets_to_imin(void);
 
+/* test_chunker.c */
+void test_chunk_count_rounds_up(void);
+void test_chunker_marks_and_completes(void);
+
 void app_main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_accepts_strictly_newer);
@@ -31,6 +35,8 @@ void app_main(void) {
     RUN_TEST(test_trickle_suppresses_when_k_consistent);
     RUN_TEST(test_trickle_doubles_and_caps);
     RUN_TEST(test_trickle_inconsistent_resets_to_imin);
+    RUN_TEST(test_chunk_count_rounds_up);
+    RUN_TEST(test_chunker_marks_and_completes);
     int failures = UNITY_END();
     if (failures != 0) {
         exit(failures);  /* propagate red tests as a non-zero exit code */
