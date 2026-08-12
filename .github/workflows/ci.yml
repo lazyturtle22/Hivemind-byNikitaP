@@ -8,6 +8,7 @@ jobs:
   host-tests:
     name: hive_core host tests (linux target)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     container: espressif/idf:release-v5.2
     steps:
       - uses: actions/checkout@v4
@@ -24,6 +25,7 @@ jobs:
   firmware-build:
     name: firmware build (esp32c6)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     container: espressif/idf:release-v5.2
     steps:
       - uses: actions/checkout@v4

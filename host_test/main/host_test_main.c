@@ -52,7 +52,8 @@ void app_main(void) {
     RUN_TEST(test_verify_rejects_bad_hash);
     RUN_TEST(test_verify_rejects_bad_auth);
     int failures = UNITY_END();
-    if (failures != 0) {
-        exit(failures);  /* propagate red tests as a non-zero exit code */
-    }
+    /* Always exit explicitly: on the ESP-IDF linux target the simulated
+     * FreeRTOS keeps the process alive after app_main returns, which hangs
+     * CI forever on a fully green run. */
+    exit(failures);
 }
