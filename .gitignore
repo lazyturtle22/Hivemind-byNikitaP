@@ -1,0 +1,26 @@
+# ESP-IDF build artifacts
+build/
+sdkconfig
+sdkconfig.old
+managed_components/
+dependencies.lock
+*.bin
+*.elf
+*.map
+
+# Signing keys / secrets — never commit
+*.pem
+*.key
+secrets/
+.env
+
+# Node (dashboard bridge)
+node_modules/
+dist/
+npm-debug.log*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
