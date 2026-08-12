@@ -19,6 +19,9 @@ node_modules/
 dist/
 npm-debug.log*
 
+# Visual brainstorming companion (local-only working files)
+.superpowers/
+
 # OS / editor
 .DS_Store
 Thumbs.db

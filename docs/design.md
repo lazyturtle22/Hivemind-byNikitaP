@@ -35,14 +35,20 @@ OTA tool**, not malware — the whole security model exists to make sure only fi
 - ESP-NOW transport, automatic (epidemic) propagation with Trickle timing.
 - Recovery-image safety model (see §6) so a bad update can never brick a board.
 - SHA-256 integrity always-on; a pluggable `verify_image()` authenticity seam.
-- Host-side firmware **registry/history** + a live fleet **version-map** dashboard.
-- Windows-first PowerShell tooling (build / seed / monitor).
+- A **standalone Electron desktop console** (§8.4) — the operator cockpit — that exposes
+  **all** program functionality: live spatial fleet map, seed a board, import/browse/re-seed
+  firmware, node detail, recovery/heal, logs, settings. Distribution-only (consumes signed
+  `.bin`s; needs esptool + serial).
+- Host-side firmware **registry/history** feeding the console.
+- PowerShell scripts (build / seed / monitor) as the headless / CI path.
 
 ### Explicitly NOT in v1 (kept as clean future work)
 - WiFi "fast-path" for quicker transfer of large images.
 - Full **hardware** Secure Boot (irreversible eFuse burn).
 - Grafting the agent into the large CSI sensing firmware.
 - Mixed-chip fleets (anything other than ESP32-C6).
+- IDE plugin (e.g. a "Send to Hivemind" button in the ESP-IDF VS Code extension).
+- In-app firmware **building/signing** (stays in ESP-IDF / CI / offline signing box).
 
 ## 4. Hardware context
 
@@ -199,19 +205,69 @@ you put old code back on the fleet.
 `seed.ps1 -Port COMx` flashes one node over USB with the current build; it spreads from
 there. Any node can be seeded (no designated seed).
 
-### 8.3 Live version-map dashboard
+### 8.3 Live version-map (fed by a gateway node)
 A live map of which node runs which version. Fed by a **gateway node**: any USB-connected
 node already hears every neighbour's beacon, so it forwards `{node, version}` sightings to
-the host, which reconstructs the whole fleet's version map. The dashboard also hosts the
-registry/history UI (§8.1). Cost: a small Node serial→browser bridge (the only Node in an
-otherwise PowerShell toolchain).
+the host, which reconstructs the whole fleet's version map. This map is the centrepiece of
+the desktop console (§8.4).
+
+### 8.4 Desktop console (the Hivemind app)
+
+The primary host surface is a **standalone Electron desktop app** — the operator's cockpit
+for provisioning and watching the fleet. The PowerShell scripts (§11) remain as a
+headless/CI path, but a bench operator lives in this app.
+
+**Scope — distribution only.** The console does **not** build or sign firmware (that stays
+in ESP-IDF / CI / an offline signing box, per the §7.3 trust model). It consumes
+**already-signed `.bin`** images. Natively it needs only **esptool** (to flash a seed) and
+**serial access** (to read the gateway node). This keeps it small, portable, and true to
+"distribution open, authorization narrow" (§7.4).
+
+**Primary user:** bench operators provisioning the 500–1000 board fleet — no IDE knowledge
+required. (An IDE plugin, e.g. a "Send to Hivemind" button in the ESP-IDF VS Code extension,
+is possible future work but not v1.)
+
+**Tech:** Electron (Node main process + web/React renderer), reusing the `serialport`
+patterns from the `Wifi-vision-test` host. Main process owns serial + esptool + the registry
+on disk; renderer is the UI.
+
+**Shell — "cockpit."** One full-bleed live canvas (the fleet map) is the app; a top
+**command bar** drives actions and **slide-over panels** (Seed, Firmware, Settings) overlay
+the map. Fewest "pages," most "watch the room."
+
+**Fleet map — spatial room map.** Nodes drawn at their real `(x, y)` positions (same mental
+model as the Wifi-vision `/room` view); the update visibly ripples outward from the seed
+across physical space. Node states: **updated**, **receiving now**, **old version**,
+**recovery / safe mode**, plus the highlighted **seed**.
+
+**Palette — light "green & white."** White canvas, emerald primary `#16a34a` (deep green
+`#15803d` for text/wordmark), neutral gray `#c3ccd4` for old nodes, pale green `#eafaef` for
+the receiving ring. Amber is reserved strictly for warnings (e.g. the recovery alert).
+Defined as theme tokens so a dark variant can be added later without rework.
+
+**Surfaces and the functionality they deliver** (the console must expose *all* program
+functionality — this is the acceptance bar):
+
+| Surface | Delivers |
+|---|---|
+| Command bar | Fleet summary pills (per-version counts, receiving), live/gateway indicator, actions (Firmware · Seed · Settings), and a **recovery alert** when a node is in safe mode |
+| Spatial map | The live fleet + spreading wave; click a node for detail |
+| Node popover | Version, MAC, health, RSSI, last-seen, **recovery/safe-mode state**, per-node `Re-seed` / `Logs` |
+| Seed slide-over | Pick signed image → pick seed COM port → confirm (shows integrity/anti-rollback/chip-id checks) → **flash** → progress → success/fail |
+| Firmware registry panel | **Import** a signed `.bin` (records version · size · SHA-256 · signature), browse **history**, **Re-seed** any version (re-stamped as a new higher version per §8.1) |
+| Settings panel | Gateway COM port, `verify_image()` mode (HMAC secret / ECDSA public key), serial options |
+| Logs drawer | Per-node and global event stream (`VERSION` / `HEARD` / `PULL_*` / `INSTALL` / `ROLLBACK`) |
+
+**Data feed:** gateway node → serial → Electron main process → renderer. The main process
+reconstructs the version map from beacon sightings and streams updates to the UI; the
+registry (signed `.bin`s + metadata) lives on the host filesystem.
 
 ## 9. Observability
 - **LED** encodes version (e.g. blink count = version number) — watch nodes visibly "flip"
   as the wave passes.
 - **Serial log** — structured events: `VERSION`, `HEARD`, `PULL_START`, `PULL_DONE`,
   `INSTALL`, `ROLLBACK`.
-- **Dashboard** — fleet-wide live version-map + history (§8.3).
+- **Desktop console** — fleet-wide live version-map + registry/history (§8.4).
 
 ## 10. Repository layout
 
@@ -220,18 +276,21 @@ otherwise PowerShell toolchain).
   /main            state machine, esp-now transport, ota writer, verify() seam, led
   /recovery        the immutable recovery program (ears + parachute)
   partitions.csv   recovery + ota_0 + nvs + otadata layout
-/scripts           build.ps1, seed.ps1, monitor.ps1
-/dashboard         live version-map + firmware registry (static page + node serial bridge)
+/console           Electron desktop app (distribution-only console)
+  /main            Node main process: serial, esptool, firmware registry on disk
+  /renderer        React cockpit UI (spatial map, command bar, slide-over panels)
+/scripts           headless/CI path: build.ps1, seed.ps1, monitor.ps1
 /docs              this design, security model, "grafting into CSI later"
 README.md          framed clearly as an authorized OTA/provisioning tool
 LICENSE
 ```
 
 ## 11. Tooling
-- `build.ps1` — build image, stamp a monotonically increasing version.
+The **desktop console (§8.4)** is the primary operator surface. The scripts below are the
+headless / CI path and back the console's actions:
+- `build.ps1` — build image, stamp a monotonically increasing version (dev/CI, not the app).
 - `seed.ps1 -Port COMx` — flash one node (the seed).
 - `monitor.ps1 -Port COMx` — tail a node's serial log.
-- `dashboard/` — optional live map + registry (static page + tiny Node serial bridge).
 
 ## 12. Decisions log
 - Standalone spreader first; graft into CSI firmware later. ✔
@@ -243,8 +302,15 @@ LICENSE
 - Integrity always-on (SHA-256); authenticity via pluggable `verify_image()`
   (HMAC now → ECDSA later). ✔
 - History on the **host** registry, not on nodes. ✔
-- Observability: LED + serial + host dashboard (gateway-node fed). ✔
-- Tooling: PowerShell-first; a small Node bridge only for the dashboard. ✔
+- Observability: LED + serial + desktop console (gateway-node fed). ✔
+- Host surface: **standalone Electron desktop app**, **distribution-only** (no toolchain;
+  consumes signed `.bin`s; needs esptool + serial). PowerShell scripts remain the headless/CI
+  path. ✔
+- Console for **bench operators**; IDE plugin is future work, not v1. ✔
+- UI: **cockpit** shell (one live canvas + command bar + slide-over panels); **spatial** room
+  map; **light green & white** palette (emerald `#16a34a` on white). ✔
+- The console must expose **all** program functionality (seed, import, history, re-seed,
+  node detail, recovery/heal, logs, settings) — that completeness is the acceptance bar. ✔
 - Repo: **Hivemind-byNikitaP**, **public**, sole authorship (no AI co-author trailer). ✔
 
 ## 13. Open questions
