@@ -22,6 +22,14 @@ void test_trickle_inconsistent_resets_to_imin(void);
 void test_chunk_count_rounds_up(void);
 void test_chunker_marks_and_completes(void);
 
+/* test_verify.c */
+void test_verify_accepts_good(void);
+void test_verify_rejects_bad_magic(void);
+void test_verify_rejects_wrong_chip(void);
+void test_verify_rejects_not_newer(void);
+void test_verify_rejects_bad_hash(void);
+void test_verify_rejects_bad_auth(void);
+
 void app_main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_accepts_strictly_newer);
@@ -37,6 +45,12 @@ void app_main(void) {
     RUN_TEST(test_trickle_inconsistent_resets_to_imin);
     RUN_TEST(test_chunk_count_rounds_up);
     RUN_TEST(test_chunker_marks_and_completes);
+    RUN_TEST(test_verify_accepts_good);
+    RUN_TEST(test_verify_rejects_bad_magic);
+    RUN_TEST(test_verify_rejects_wrong_chip);
+    RUN_TEST(test_verify_rejects_not_newer);
+    RUN_TEST(test_verify_rejects_bad_hash);
+    RUN_TEST(test_verify_rejects_bad_auth);
     int failures = UNITY_END();
     if (failures != 0) {
         exit(failures);  /* propagate red tests as a non-zero exit code */
