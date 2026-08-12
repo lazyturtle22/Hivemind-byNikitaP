@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  host-tests:
+    name: hive_core host tests (linux target)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    container: espressif/idf:release-v5.2
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Unity tests on the linux target
+        shell: bash
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          . "$IDF_PATH/export.sh"
+          cd host_test
+          idf.py --preview set-target linux
+          idf.py build
+          ./build/host_test.elf
+
+  firmware-build:
+    name: firmware build (esp32c6)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    container: espressif/idf:release-v5.2
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build for esp32c6
+        shell: bash
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          . "$IDF_PATH/export.sh"
+          cd firmware
+          idf.py set-target esp32c6
+          idf.py build
